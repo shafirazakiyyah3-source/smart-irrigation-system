@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitoring Agroteknologi IoT</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>🌱 Monitoring Agroteknologi IoT</h1>
+
+<div class="cards">
+
+<div class="card">
+<h2>🌡 Suhu</h2>
+<p id="temp">-- °C</p>
+</div>
+
+<div class="card">
+<h2>💧 Kelembapan Udara</h2>
+<p id="hum">-- %</p>
+</div>
+
+<div class="card">
+<h2>🌿 Kelembapan Tanah</h2>
+<p id="soil">-- %</p>
+</div>
+
+</div>
+
+<div class="control">
+
+<div class="relay">
+
+<h3>💨 Fan</h3>
+
+<button onclick="relay(1,true)">ON</button>
+
+<button onclick="relay(1,false)">OFF</button>
+
+<p id="fanState">Status : OFF</p>
+
+</div>
+
+<div class="relay">
+
+<h3>💦 Pump</h3>
+
+<button onclick="relay(3,true)">ON</button>
+
+<button onclick="relay(3,false)">OFF</button>
+
+<p id="pumpState">Status : OFF</p>
+
+</div>
+
+</div>
+
+</div>
+
+<script src="script.js"></script>
+
+</body>
+</html>
