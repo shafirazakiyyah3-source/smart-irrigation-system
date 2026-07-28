@@ -1,12 +1,13 @@
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
+#include <AsyncJson.h>
+#include <ArduinoJson.h>
 #include <LittleFS.h>
 #include <Adafruit_Sensor.h>
 #include <DHT.h>
 #include <DHT_U.h>
 #include <LiquidCrystal_I2C.h>
 #include <ThingSpeak.h>
-#include <ArduinoJson.h>
 
 // ─── Pin Definitions ────────────────────────────────────────────────────────
 #define DHTPIN        4
@@ -94,7 +95,7 @@ void pushThingSpeak() {
 
 // ─── Sensor JSON for web ────────────────────────────────────────────────────
 String getSensorJSON() {
-  StaticJsonDocument<200> doc;
+  JsonDocument doc;
   doc["temp"]    = temperature;
   doc["hum"]     = humidity;
   doc["soil"]    = soilPercentage;
@@ -109,8 +110,18 @@ String getSensorJSON() {
 void setup() {
   Serial.begin(115200);
 
+  // --- CEGAH RELAY NYALA SAAT BOOTING ---
+  // Paksa pin ke HIGH (MATI untuk Active-LOW) sebelum dijadikan OUTPUT
+  digitalWrite(RELAY1_PIN, HIGH);
+  digitalWrite(RELAY3_PIN, HIGH);
+  pinMode(RELAY1_PIN, OUTPUT);
+  pinMode(RELAY3_PIN, OUTPUT);
+  
+  relay1State = false;
+  relay3State = false;
+
   // LCD splash
-  lcd.init();
+  lcd.init(); // Jika di IDE kamu minta begin(), ganti jadi lcd.begin();
   lcd.backlight();
   lcd.setCursor(3, 0);
   lcd.print("Selamat Datang!");
@@ -121,13 +132,9 @@ void setup() {
   delay(3000);
   lcd.clear();
 
-  // Sensors & relays
+  // Sensors
   pinMode(soilPin, INPUT);
   dht.begin();
-  pinMode(RELAY1_PIN, OUTPUT);
-  pinMode(RELAY3_PIN, OUTPUT);
-  setRelay(RELAY1_PIN, false);
-  setRelay(RELAY3_PIN, false);
 
   // LittleFS
   if (!LittleFS.begin(true)) {
@@ -166,26 +173,33 @@ void setup() {
   });
 
   // POST /api/relay — body: {"relay":1,"state":true}
-  AsyncCallbackJsonWebHandler* relayHandler = new AsyncCallbackJsonWebHandler(
-    "/api/relay",
-    [](AsyncWebServerRequest* req, JsonVariant& json) {
-      JsonObject obj = json.as<JsonObject>();
-      int  relay = obj["relay"];
-      bool state = obj["state"];
+  // Menggunakan Raw Body Handler agar kompatibel 100% dengan ArduinoJson v7
+  server.on("/api/relay", HTTP_POST, 
+    [](AsyncWebServerRequest *request){}, 
+    NULL, 
+    [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+      JsonDocument doc;
+      DeserializationError error = deserializeJson(doc, data, len);
 
-      if (relay == 1) {
-        relay1State = state;
-        setRelay(RELAY1_PIN, relay1State);
-        Serial.printf("[Relay] Fan -> %s\n", relay1State ? "ON" : "OFF");
-      } else if (relay == 3) {
-        relay3State = state;
-        setRelay(RELAY3_PIN, relay3State);
-        Serial.printf("[Relay] Pump -> %s\n", relay3State ? "ON" : "OFF");
+      if (!error) {
+        int  relay = doc["relay"];
+        bool state = doc["state"];
+
+        if (relay == 1) {
+          relay1State = state;
+          setRelay(RELAY1_PIN, relay1State);
+          Serial.printf("[Relay] Fan -> %s\n", relay1State ? "ON" : "OFF");
+        } else if (relay == 3) {
+          relay3State = state;
+          setRelay(RELAY3_PIN, relay3State);
+          Serial.printf("[Relay] Pump -> %s\n", relay3State ? "ON" : "OFF");
+        }
+      } else {
+        Serial.println("[Server] Error parsing JSON body");
       }
-      req->send(200, "application/json", getSensorJSON());
+      request->send(200, "application/json", getSensorJSON());
     }
   );
-  server.addHandler(relayHandler);
 
   server.begin();
   Serial.println("[Server] Started");
